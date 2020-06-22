@@ -591,26 +591,31 @@ def read_dataset(filename):
     f.close()
     raw_data = np.uint32(raw_data)
 
+    n = len(raw_data) % 5
+    if n > 0:
+        raw_data = raw_data[:-n]
+
     all_y = raw_data[1::5]
     all_x = raw_data[0::5]
     all_p = (raw_data[2::5] & 128) >> 7  # bit 7
     all_ts = ((raw_data[2::5] & 127) << 16) | (raw_data[3::5] << 8) | (
         raw_data[4::5])
 
+    height = np.max(all_y) + 1
+    width = np.max(all_x) + 1
+
     # Process time stamp overflow events
     time_increment = 2 ** 13
-    overflow_indices = np.where(all_y == 240)[0]
+    overflow_indices = np.flatnonzero(all_y == 240)
     for overflow_index in overflow_indices:
         all_ts[overflow_index:] += time_increment
 
     # Everything else is a proper td spike
-    td_indices = np.where(all_y != 240)[0]
+    td_indices = np.flatnonzero(all_y != 240)
 
-    td = Events(td_indices.size, 34, 34)
+    td = Events(td_indices.size, width, height)
     td.data.x = all_x[td_indices]
-    td.width = td.data.x.max() + 1
     td.data.y = all_y[td_indices]
-    td.height = td.data.y.max() + 1
     td.data.ts = all_ts[td_indices]
     td.data.p = all_p[td_indices]
     return td
